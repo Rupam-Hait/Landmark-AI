@@ -1,12 +1,13 @@
 # Landmark AI 🏛️
 ### AI-Powered Legacy Land Records Digitization & Verification Platform
 
-[![Python](https://img.shields.io/badge/Python-3.14%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://reactjs.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38B2AC.svg)](https://tailwindcss.com/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-5.0-5C3EE8.svg)](https://opencv.org/)
 [![Leaflet](https://img.shields.io/badge/Leaflet-GIS-199900.svg)](https://leafletjs.com/)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRupam-Hait%2FLandmark-AI&root-directory=frontend)
 
 **Landmark AI** is an enterprise-grade, full-stack AI platform built for the **National Land Records Modernization Programme (NLRMP)**. It automates the digitization, OCR parsing, rule-based validation, fuzzy duplicate detection, and human verification of legacy handwritten and scanned land records (Jamabandis/Record of Rights, Mutation Registers, Conveyance Sale Deeds, and Khasra Girdawaris).
 
@@ -72,7 +73,27 @@ flowchart LR
 
 ---
 
-## 🚀 Quick Start Guide
+## ☁️ Cloud Deployment Guide (Public Live URLs)
+
+### Deploy Frontend to Vercel
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRupam-Hait%2FLandmark-AI&root-directory=frontend)
+
+1. Connect your GitHub account on [Vercel](https://vercel.com).
+2. Import repository `Rupam-Hait/Landmark-AI`.
+3. Set **Root Directory** to `frontend`.
+4. Click **Deploy**.
+
+### Deploy Backend to Render
+1. Create a new Web Service on [Render](https://render.com).
+2. Connect `Rupam-Hait/Landmark-AI`.
+3. Set **Root Directory** to `backend`.
+4. Set **Build Command**: `pip install -r requirements.txt`.
+5. Set **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+6. Click **Deploy**.
+
+---
+
+## 💻 Local Development
 
 ### Prerequisites
 - Python 3.10+
@@ -89,7 +110,7 @@ cd Landmark-AI
 cd backend
 
 # Install Python dependencies
-pip install fastapi uvicorn sqlalchemy python-multipart pydantic rapidfuzz opencv-python-headless pytesseract pillow requests
+pip install -r requirements.txt
 
 # Start the FastAPI server (auto-seeds 34 realistic records and sample deeds)
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
@@ -139,6 +160,8 @@ Landmark-AI/
 │   │   ├── seed_data.py       # Database seeder (34 realistic records & deeds)
 │   │   ├── sample_generator.py# Archival deed image generator
 │   │   └── main.py            # FastAPI main application
+│   ├── Dockerfile             # Production container definition
+│   ├── requirements.txt       # Python dependencies
 │   └── test_api.py            # Automated API & pipeline integration tests
 ├── frontend/
 │   ├── src/
@@ -158,8 +181,10 @@ Landmark-AI/
 │   │   ├── api.js             # Centralized API client
 │   │   ├── App.jsx            # Main app container & routing
 │   │   └── index.css          # Tailwind CSS & Leaflet styling
+│   ├── vercel.json            # Vercel SPA routing
 │   ├── package.json
 │   └── vite.config.js
+├── render.yaml                # Render Blueprint deployment config
 └── README.md
 ```
 
