@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { StatusBadge } from './StatusBadge';
+import { getStaticUrl } from '../api';
 
 export const RecordDetailModal = ({ record, onClose, onOpenReview }) => {
   const [activeTab, setActiveTab] = useState('details'); // details, validation, scan, audit
@@ -296,7 +297,7 @@ export const RecordDetailModal = ({ record, onClose, onOpenReview }) => {
                 <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center min-h-[350px]">
                   {record.document_filepath ? (
                     <img
-                      src={`/static/${record.document_filepath.replace(/^static\//, '')}`}
+                      src={getStaticUrl(record.document_filepath)}
                       alt="Scanned Deed"
                       className="max-h-[420px] rounded object-contain shadow-lg"
                     />

@@ -1,4 +1,11 @@
-const API_BASE = '/api';
+const BACKEND_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
+
+export const getStaticUrl = (path) => {
+  if (!path) return '';
+  const cleanPath = path.replace(/^\/?(static\/)?/, '');
+  return BACKEND_URL ? `${BACKEND_URL}/static/${cleanPath}` : `/static/${cleanPath}`;
+};
 
 export const api = {
   // Dashboard

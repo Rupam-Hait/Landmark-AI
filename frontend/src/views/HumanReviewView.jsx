@@ -19,7 +19,7 @@ import {
   ArrowRightLeft,
   RefreshCw,
 } from 'lucide-react';
-import { api } from '../api';
+import { api, getStaticUrl } from '../api';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -357,7 +357,7 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
               <img
                 src={
                   previewImageUrl ||
-                  `/static/${currentRecord.document_filepath.replace(/^static\//, '')}`
+                  getStaticUrl(currentRecord.document_filepath)
                 }
                 alt="Document Scan"
                 style={{
