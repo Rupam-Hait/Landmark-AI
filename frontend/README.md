@@ -1,16 +1,26 @@
-# React + Vite
+# 🏛️ Landmark-AI — Frontend Web Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+AI-Powered Land Record Digitization, Indic OCR, and Cadastral GIS Verification Platform.
 
-Currently, two official plugins are available:
+[![Live Website](https://img.shields.io/badge/Live_Website-landmark--ai--xi.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://landmark-ai-xi.vercel.app)
+[![Backend API](https://img.shields.io/badge/Backend_API-landmark--ai--backend.onrender.com-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://landmark-ai-backend.onrender.com/docs)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🌐 Production URLs
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Live Production URL**: [https://landmark-ai-xi.vercel.app](https://landmark-ai-xi.vercel.app)
+- **Preview Deployment**: [https://landmark-lxqd4r1n0-rupam-haits-projects.vercel.app](https://landmark-lxqd4r1n0-rupam-haits-projects.vercel.app)
+- **FastAPI Backend on Render**: [https://landmark-ai-backend.onrender.com](https://landmark-ai-backend.onrender.com)
+- **Interactive Swagger Docs**: [https://landmark-ai-backend.onrender.com/docs](https://landmark-ai-backend.onrender.com/docs)
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 🚀 Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+The app will start on `http://127.0.0.1:5173`.

@@ -2,15 +2,27 @@
 ### AI-Powered Land Record Digitization, Validation & Cadastral GIS Platform
 **Engineered for the Digital India Land Records Modernization Programme (DILRMP) & Smart India Hackathon**
 
+[![Live Website](https://img.shields.io/badge/Live_Website-landmark--ai--xi.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://landmark-ai-xi.vercel.app)
+[![Backend API](https://img.shields.io/badge/Backend_API-landmark--ai--backend.onrender.com-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://landmark-ai-backend.onrender.com/docs)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black)](https://reactjs.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38B2AC.svg?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-5.0-5C3EE8.svg?logo=opencv&logoColor=white)](https://opencv.org/)
 [![Leaflet](https://img.shields.io/badge/Leaflet-Cadastral_GIS-199900.svg?logo=leaflet&logoColor=white)](https://leafletjs.com/)
-[![Recharts](https://img.shields.io/badge/Recharts-Analytics-8884d8.svg)](https://recharts.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRupam-Hait%2FLandmark-AI&root-directory=frontend)
+
+---
+
+## 🌐 Live Production Deployments
+
+| Component | Platform | Live URL | Status |
+| :--- | :--- | :--- | :--- |
+| **🌐 Production Web App** | **Vercel** | **[https://landmark-ai-xi.vercel.app](https://landmark-ai-xi.vercel.app)** | 🟢 **Live & Operational** |
+| **⚡ Preview Deployment** | **Vercel** | **[https://landmark-lxqd4r1n0-rupam-haits-projects.vercel.app](https://landmark-lxqd4r1n0-rupam-haits-projects.vercel.app)** | 🟢 **Live** |
+| **🚀 Backend API Server** | **Render** | **[https://landmark-ai-backend.onrender.com](https://landmark-ai-backend.onrender.com)** | 🟢 **Live & Healthy** |
+| **📖 Interactive API Docs** | **Swagger UI** | **[https://landmark-ai-backend.onrender.com/docs](https://landmark-ai-backend.onrender.com/docs)** | 🟢 **Active** |
+| **📁 GitHub Repository** | **GitHub** | **[https://github.com/Rupam-Hait/Landmark-AI](https://github.com/Rupam-Hait/Landmark-AI)** | 🟢 **Main Branch** |
 
 ---
 
