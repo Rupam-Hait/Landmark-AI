@@ -63,7 +63,26 @@ export const RecordsView = ({ onSelectRecord, onOpenReview }) => {
   };
 
   const handleDownloadCSV = () => {
-    window.open('/api/records/export/csv', '_blank');
+    if (!records || records.length === 0) return;
+    const exportData = records.map((r) => ({
+      Record_ID: r.record_identifier,
+      Owner_Name: r.owner_name,
+      Parentage: r.parentage,
+      Khasra_No: r.khasra_number,
+      Khata_No: r.khata_number,
+      ULPIN: r.ulpin,
+      Area_Value: r.area_value,
+      Area_Unit: r.area_unit,
+      Area_Acres: r.area_acres,
+      Land_Classification: r.land_classification,
+      Village: r.village,
+      Tehsil: r.tehsil,
+      District: r.district,
+      State: r.state,
+      Status: r.status,
+      Confidence: r.overall_confidence,
+    }));
+    api.exportCSV('landmark_ai_land_records', exportData);
   };
 
   return (

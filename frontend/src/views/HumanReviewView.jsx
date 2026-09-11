@@ -23,8 +23,9 @@ import { api, getStaticUrl } from '../api';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
 import { StatusBadge } from '../components/StatusBadge';
 
-export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate }) => {
+export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate, userProfile }) => {
   const [queue, setQueue] = useState([]);
+  const [filterMode, setFilterMode] = useState('ALL'); // 'ALL', 'LOW_CONFIDENCE', 'FLAGGED'
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentRecord, setCurrentRecord] = useState(null);
   const [formData, setFormData] = useState({});
@@ -33,10 +34,12 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imagePreset, setImagePreset] = useState('standard');
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
-  const [officerName, setOfficerName] = useState('Officer S. K. Sharma');
+  const [officerName, setOfficerName] = useState(userProfile?.name || 'Officer S. K. Sharma');
   const [officerNotes, setOfficerNotes] = useState('Document verified against cadastral sheet and revenue ledger.');
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('Illegible handwritten script in area column');
+  const [correctionNote, setCorrectionNote] = useState('Physical DGPS survey required for Khasra sub-division boundary check');
   const [feedbackMsg, setFeedbackMsg] = useState(null);
 
   // Fetch pending review queue
@@ -45,7 +48,13 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
       setLoading(true);
       const resPending = await api.getRecords({ status: 'PENDING_REVIEW', page_size: 50 });
       const resFlagged = await api.getRecords({ status: 'FLAGGED', page_size: 50 });
-      const combined = [...(resPending.items || []), ...(resFlagged.items || [])];
+      let combined = [...(resPending.items || []), ...(resFlagged.items || [])];
+
+      if (filterMode === 'LOW_CONFIDENCE') {
+        combined = combined.filter((r) => r.overall_confidence < 85);
+      } else if (filterMode === 'FLAGGED') {
+        combined = combined.filter((r) => r.is_flagged || r.status === 'FLAGGED');
+      }
 
       setQueue(combined);
 
@@ -97,7 +106,7 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
 
   useEffect(() => {
     fetchQueue();
-  }, [selectedRecordId]);
+  }, [selectedRecordId, filterMode]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -112,6 +121,13 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleAssignToMe = () => {
+    const currentName = userProfile?.name || 'Officer S. K. Sharma (Tehsildar)';
+    setOfficerName(currentName);
+    setFeedbackMsg({ type: 'success', text: `Assigned record ${currentRecord?.record_identifier} to ${currentName}` });
+    setTimeout(() => setFeedbackMsg(null), 3000);
   };
 
   const handleSaveDraft = async () => {
@@ -129,6 +145,33 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
     } catch (err) {
       setFeedbackMsg({ type: 'error', text: err.message });
     } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRequestCorrection = async () => {
+    if (!currentRecord) return;
+    try {
+      setSaving(true);
+      await api.updateRecord(currentRecord.id, {
+        ...formData,
+        status: 'PENDING_REVIEW',
+        is_flagged: true,
+        flag_reason: `Correction Requested: ${correctionNote}`,
+        reviewed_by: officerName,
+        reviewer_notes: `Correction Requested by ${officerName}: ${correctionNote}`,
+      });
+      setCorrectionModalOpen(false);
+      setFeedbackMsg({ type: 'success', text: `Correction request dispatched to Patwari for ${currentRecord.record_identifier}` });
+
+      if (onRecordUpdated) onRecordUpdated();
+
+      setTimeout(() => {
+        setFeedbackMsg(null);
+        fetchQueue();
+      }, 1200);
+    } catch (err) {
+      setFeedbackMsg({ type: 'error', text: err.message });
       setSaving(false);
     }
   };
@@ -203,20 +246,20 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
         </div>
         <h3 className="text-lg font-bold text-slate-100">Review Queue is Clear!</h3>
         <p className="text-xs text-slate-400 max-w-md mx-auto">
-          There are currently no documents pending human review. All records have either been auto-verified or certified by an officer.
+          There are currently no documents pending human review in this filter. All records have either been auto-verified or certified by an officer.
         </p>
         <div className="pt-2 flex justify-center gap-3">
           <button
-            onClick={() => onNavigate('upload')}
+            onClick={() => setFilterMode('ALL')}
             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
           >
-            Upload New Document
+            Reset Queue Filter
           </button>
           <button
-            onClick={() => onNavigate('records')}
+            onClick={() => onNavigate('upload')}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
           >
-            Explore Land Records
+            Upload New Document
           </button>
         </div>
       </div>
@@ -230,46 +273,84 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
   return (
     <div className="space-y-4 animate-fade-in pb-12">
       {/* Top Header & Queue Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-bold text-slate-100">{currentRecord.record_identifier}</h2>
               <StatusBadge status={currentRecord.status} isFlagged={currentRecord.is_flagged} size="sm" />
               <ConfidenceBadge score={currentRecord.overall_confidence} size="sm" />
             </div>
-            <p className="text-xs text-slate-400">
-              Document Type: <span className="text-slate-300 font-medium">{currentRecord.document_type}</span> &bull; {currentRecord.district}
+            <p className="text-xs text-slate-400 mt-0.5">
+              Type: <span className="text-slate-300 font-medium">{currentRecord.document_type}</span> &bull; {currentRecord.district}, {currentRecord.state}
             </p>
           </div>
         </div>
 
-        {/* Queue Navigator */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-mono">
-            Reviewing <span className="text-slate-200 font-semibold">{currentIndex + 1}</span> of{' '}
-            <span className="text-slate-200 font-semibold">{queue.length}</span>
-          </span>
-          <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
+        {/* Filter Pills & Assign To Me */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filter Pills */}
+          <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1 text-xs">
             <button
-              onClick={() => handleNavigateQueue(currentIndex - 1)}
-              disabled={currentIndex === 0}
-              className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-              title="Previous document"
+              onClick={() => setFilterMode('ALL')}
+              className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer text-[11px] ${
+                filterMode === 'ALL' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <ChevronLeft className="w-4 h-4" />
+              All
             </button>
             <button
-              onClick={() => handleNavigateQueue(currentIndex + 1)}
-              disabled={currentIndex >= queue.length - 1}
-              className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-              title="Next document"
+              onClick={() => setFilterMode('LOW_CONFIDENCE')}
+              className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer text-[11px] ${
+                filterMode === 'LOW_CONFIDENCE' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <ChevronRight className="w-4 h-4" />
+              Low Conf (&lt;85%)
             </button>
+            <button
+              onClick={() => setFilterMode('FLAGGED')}
+              className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer text-[11px] ${
+                filterMode === 'FLAGGED' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Flagged Duplicates
+            </button>
+          </div>
+
+          <button
+            onClick={handleAssignToMe}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Assign to Me</span>
+          </button>
+
+          {/* Queue Navigator */}
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+            <span className="text-xs text-slate-400 font-mono">
+              <span className="text-slate-200 font-semibold">{currentIndex + 1}</span> / {queue.length}
+            </span>
+            <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
+              <button
+                onClick={() => handleNavigateQueue(currentIndex - 1)}
+                disabled={currentIndex === 0}
+                className="p-1 rounded text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                title="Previous document"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleNavigateQueue(currentIndex + 1)}
+                disabled={currentIndex >= queue.length - 1}
+                className="p-1 rounded text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                title="Next document"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -613,7 +694,16 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
               <span>Reject Document</span>
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setCorrectionModalOpen(true)}
+                disabled={saving}
+                className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Request Correction</span>
+              </button>
+
               <button
                 onClick={handleSaveDraft}
                 disabled={saving}
@@ -658,15 +748,52 @@ export const HumanReviewView = ({ selectedRecordId, onRecordUpdated, onNavigate 
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setRejectModalOpen(false)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium"
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReject}
-                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold"
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer"
               >
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request Correction Modal */}
+      {correctionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              <span>Request Patwari / Field Correction</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Specify the clarification or field re-measurement needed by the village Patwari or Revenue Inspector.
+            </p>
+
+            <textarea
+              rows={3}
+              value={correctionNote}
+              onChange={(e) => setCorrectionNote(e.target.value)}
+              className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-amber-500"
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setCorrectionModalOpen(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRequestCorrection}
+                className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer"
+              >
+                Send Correction Order
               </button>
             </div>
           </div>

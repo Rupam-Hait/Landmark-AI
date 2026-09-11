@@ -491,3 +491,45 @@ def export_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=land_records_export.csv"},
     )
+
+
+@router.get("/audit-logs")
+def list_audit_logs(
+    search: Optional[str] = None,
+    action: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    query = db.query(AuditLog).order_by(desc(AuditLog.created_at))
+    if search:
+        s = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                AuditLog.performed_by.ilike(s),
+                AuditLog.action.ilike(s),
+                AuditLog.notes.ilike(s),
+            )
+        )
+    if action:
+        query = query.filter(AuditLog.action.ilike(f"%{action.strip()}%"))
+
+    logs = query.limit(limit).all()
+    results = []
+    for log in logs:
+        item = log.to_dict()
+        if log.land_record:
+            item["record_identifier"] = log.land_record.record_identifier
+        results.append(item)
+    return results
+
+
+@router.get("/fraud-flags")
+def list_fraud_flags(db: Session = Depends(get_db)):
+    flagged = (
+        db.query(LandRecord)
+        .filter(or_(LandRecord.is_flagged == True, LandRecord.status == "FLAGGED"))
+        .order_by(desc(LandRecord.created_at))
+        .all()
+    )
+    return [r.to_dict() for r in flagged]
+

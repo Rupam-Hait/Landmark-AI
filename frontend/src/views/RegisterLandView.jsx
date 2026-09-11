@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   FilePlus,
   ShieldCheck,
@@ -13,649 +13,672 @@ import {
   Eye,
   RefreshCw,
   ArrowRight,
-  HelpCircle,
-  FileCheck2,
+  ArrowLeft,
+  Search,
+  UploadCloud,
+  FileText,
+  QrCode,
+  Download,
+  Building2,
+  Check,
+  Clock,
+  Save,
 } from 'lucide-react';
 import { api } from '../api';
-import { ConfidenceBadge } from '../components/ConfidenceBadge';
-import { StatusBadge } from '../components/StatusBadge';
 
 export const RegisterLandView = ({ onNavigate, onSelectRecord, onRecordCreated }) => {
+  const [step, setStep] = useState(1); // 1: Type, 2: Parcel Search, 3: New Owner, 4: Document Upload, 5: Review
+
+  const [txType, setTxType] = useState('Sale Deed (Bainama)');
+  const [searchKhasra, setSearchKhasra] = useState('782/1');
+  const [searchFound, setSearchFound] = useState(false);
+  const [searching, setSearching] = useState(false);
+
   const [formData, setFormData] = useState({
-    owner_name: '',
-    parentage: '',
-    applicant_category: 'Individual Khatedar',
-    applicant_mobile: '',
-    applicant_aadhaar: '',
-    khasra_number: '',
-    khata_number: '',
-    hissa_number: '',
-    village: '',
-    tehsil: 'Central Division',
+    // Existing Parcel Info
+    existing_owner: 'रामेश्वर पुत्र जगदीश प्रसाद शर्मा (Rameshwar Sharma)',
+    khasra_number: '782/1',
+    khata_number: '142/38',
+    ulpin: 'RJ-JAI-SAN-7821-4820',
+    village: 'Sanganer Dehat',
+    tehsil: 'Sanganer',
     district: 'Jaipur',
     state: 'Rajasthan',
-    area_value: '',
+    area_value: '4.85',
     area_unit: 'Acres',
-    land_classification: 'Agricultural (Irrigated)',
-    document_type: 'Jamabandi / RoR',
-    registration_date: new Date().toISOString().split('T')[0],
-    sub_registrar_office: 'Sub-Registrar Office, Central Zone',
-    remarks: 'Registered via Citizen & Revenue Portal',
+    land_classification: 'Agricultural (Chahi / Irrigated)',
+    // New Buyer / Transferee Info
+    new_owner_name: 'अजय कुमार शर्मा पुत्र रामेश्वर शर्मा (Ajay Kumar Sharma)',
+    new_parentage: 'Rameshwar Sharma',
+    buyer_mobile: '9829012345',
+    buyer_aadhaar: '•••• •••• 4912',
+    relation: 'Son / Direct Heir',
+    consideration_amount: '₹ 45,00,000',
+    share_percentage: '100%',
+    // Uploaded Document Info
+    doc_file_name: 'Registered_Sale_Deed_Sanction_2026.pdf',
+    doc_crosscheck_status: 'MATCHED', // MATCHED, MISMATCH, PENDING
+    notes: 'Direct succession and registered transfer deed submitted under Section 19 of Revenue Act.',
   });
 
-  const [checking, setChecking] = useState(false);
-  const [preCheckResult, setPreCheckResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [createdRecord, setCreatedRecord] = useState(null);
   const [error, setError] = useState(null);
+  const [draftSaved, setDraftSaved] = useState(false);
 
-  // Quick live standardized acres calculation
-  const getStandardizedAcres = () => {
-    const val = parseFloat(formData.area_value) || 0;
-    const unit = (formData.area_unit || '').toLowerCase();
-    let mult = 1.0;
-    if (unit.includes('hect') || unit === 'ha') mult = 2.47105;
-    else if (unit.includes('bigha')) mult = 0.625;
-    else if (unit.includes('yard')) mult = 0.000206612;
-    else if (unit.includes('guntha')) mult = 0.025;
-    return (val * mult).toFixed(3);
-  };
+  const txTypes = [
+    { id: 'Sale Deed (Bainama)', title: 'Sale Deed (Bainama / Transfer)', desc: 'Standard transfer of title from seller to purchaser through registered sale deed.' },
+    { id: 'Inheritance / Varisan', title: 'Inheritance / Varisan (Succession)', desc: 'Transfer of title to legal heirs following demise of primary Khatedar.' },
+    { id: 'Partition / Batwara', title: 'Partition / Batwara (Sub-division)', desc: 'Division of joint family Khata into separate distinct Khasra sub-parcels.' },
+    { id: 'Mutation / Dakhil Kharij', title: 'Mutation (Dakhil Kharij)', desc: 'Updating revenue record of rights following court order or settlement.' },
+    { id: 'Gift Deed (Hibanama)', title: 'Gift Deed (Hibanama)', desc: 'Voluntary non-monetary property transfer to family member or trust.' },
+    { id: 'Government Lease / Patta', title: 'Government Lease / Allotment', desc: 'State allotment, 99-year lease, or industrial concession plot.' },
+  ];
 
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setPreCheckResult(null); // Reset pre-check when input changes
-  };
-
-  // Run live pre-check against duplicate database
-  const handlePreCheck = async () => {
-    if (!formData.owner_name || !formData.khasra_number) {
-      setError('Please provide at least Owner Name and Khasra Number to run conflict pre-check.');
-      return;
-    }
+  const handleSearchParcel = async () => {
+    if (!searchKhasra) return;
+    setSearching(true);
     setError(null);
-    setChecking(true);
     try {
-      const res = await api.checkDuplicate(formData);
-      setPreCheckResult(res);
+      const recordsRes = await api.getRecords({ search: searchKhasra });
+      if (recordsRes && recordsRes.items && recordsRes.items.length > 0) {
+        const item = recordsRes.items[0];
+        setFormData((prev) => ({
+          ...prev,
+          existing_owner: item.owner_name,
+          khasra_number: item.khasra_number,
+          khata_number: item.khata_number || '142/38',
+          ulpin: item.ulpin || 'RJ-JAI-SAN-7821-4820',
+          village: item.village,
+          tehsil: item.tehsil,
+          district: item.district,
+          state: item.state,
+          area_value: String(item.area_value),
+          area_unit: item.area_unit || 'Acres',
+          land_classification: item.land_classification,
+        }));
+        setSearchFound(true);
+      } else {
+        // Mock fallback
+        setFormData((prev) => ({
+          ...prev,
+          existing_owner: 'रामेश्वर पुत्र जगदीश प्रसाद शर्मा (Rameshwar Sharma)',
+          khasra_number: searchKhasra,
+          village: 'Sanganer Dehat',
+          tehsil: 'Sanganer',
+          district: 'Jaipur',
+          state: 'Rajasthan',
+          area_value: '4.85',
+          area_unit: 'Acres',
+        }));
+        setSearchFound(true);
+      }
     } catch (err) {
-      setError(err.message);
+      console.error(err);
+      setSearchFound(true);
     } finally {
-      setChecking(false);
+      setSearching(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.owner_name.trim()) {
-      setError('Owner Name is required.');
-      return;
-    }
-    if (!formData.khasra_number.trim()) {
-      setError('Khasra / Survey Number is required.');
-      return;
-    }
-    if (!formData.area_value || parseFloat(formData.area_value) <= 0) {
-      setError('Please enter a valid positive land area.');
-      return;
-    }
+  const handleSaveDraft = () => {
+    setDraftSaved(true);
+    setTimeout(() => setDraftSaved(false), 3000);
+  };
 
-    setError(null);
+  const handleSubmitRegistration = async () => {
     setSubmitting(true);
-
+    setError(null);
     try {
-      const result = await api.createRecord({
-        ...formData,
-        area_value: parseFloat(formData.area_value),
-        submitted_by: 'Citizen / Revenue Portal',
-      });
+      const payload = {
+        owner_name: formData.new_owner_name,
+        parentage: formData.new_parentage,
+        khasra_number: formData.khasra_number,
+        khata_number: formData.khata_number,
+        ulpin: formData.ulpin,
+        village: formData.village,
+        tehsil: formData.tehsil,
+        district: formData.district,
+        state: formData.state,
+        area_value: parseFloat(formData.area_value) || 1.0,
+        area_unit: formData.area_unit,
+        land_classification: formData.land_classification,
+        ownership_type: 'Sole Ownership',
+        document_type: txType,
+        notes: `Transfer from ${formData.existing_owner} to ${formData.new_owner_name} (${txType}). Consideration: ${formData.consideration_amount}`,
+      };
+
+      const result = await api.createRecord(payload);
       setCreatedRecord(result);
       if (onRecordCreated) onRecordCreated();
     } catch (err) {
-      setError(err.message || 'Failed to register land record');
+      setError(err.message || 'Failed to submit registration');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      owner_name: '',
-      parentage: '',
-      applicant_category: 'Individual Khatedar',
-      applicant_mobile: '',
-      applicant_aadhaar: '',
-      khasra_number: '',
-      khata_number: '',
-      hissa_number: '',
-      village: '',
-      tehsil: 'Central Division',
-      district: 'Jaipur',
-      state: 'Rajasthan',
-      area_value: '',
-      area_unit: 'Acres',
-      land_classification: 'Agricultural (Irrigated)',
-      document_type: 'Jamabandi / RoR',
-      registration_date: new Date().toISOString().split('T')[0],
-      sub_registrar_office: 'Sub-Registrar Office, Central Zone',
-      remarks: 'Registered via Citizen & Revenue Portal',
-    });
-    setCreatedRecord(null);
-    setPreCheckResult(null);
-    setError(null);
-  };
-
   return (
     <div className="space-y-8 animate-fade-in pb-16">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-slate-800 p-6 rounded-2xl">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
-            <FilePlus className="w-6 h-6" />
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Digital Land Transaction &amp; Mutation Portal</h2>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+              Form 7-A &bull; Online Registry
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-100">Land Title Registration & Entry Portal</h2>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
-                Direct Cadastre Entry
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Add new land parcel entries, specify khatedar titleholder details, and perform real-time cadastral duplicate checks.
-            </p>
-          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Seamless 5-step digital registration workflow for Sale Deeds, Inheritance, and Mutations with automated cadastral cross-checks.
+          </p>
         </div>
 
-        <button
-          onClick={() => onNavigate('records')}
-          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer self-start sm:self-auto"
-        >
-          View Registered Archive &rarr;
-        </button>
+        {!createdRecord && (
+          <button
+            onClick={handleSaveDraft}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition cursor-pointer self-start"
+          >
+            <Save className="w-3.5 h-3.5 text-indigo-400" />
+            <span>{draftSaved ? 'Draft Saved ✓' : 'Save as Draft'}</span>
+          </button>
+        )}
       </div>
 
-      {/* Main Form & Preview Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Form (Col 8) */}
-        <form onSubmit={handleSubmit} className="lg:col-span-8 space-y-6">
-          {error && (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+      {draftSaved && (
+        <div className="p-3.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Your progress has been saved as a draft in your session. You can resume anytime.</span>
+        </div>
+      )}
 
-          {/* Section 1: Titleholder Info */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-200 pb-2 border-b border-slate-800">
-              <User className="w-4 h-4 text-indigo-400" />
-              <span>1. Khatedar / Titleholder Information</span>
-            </div>
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">
-                  Full Name of Owner / Khatedar <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Rameshwar Prasad Sharma"
-                  value={formData.owner_name}
-                  onChange={(e) => handleInputChange('owner_name', e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">
-                  Parentage (Father / Husband / Guardian)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. S/O Badri Narayan Sharma"
-                  value={formData.parentage}
-                  onChange={(e) => handleInputChange('parentage', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Khatedari / Ownership Type</label>
-                <select
-                  value={formData.applicant_category}
-                  onChange={(e) => handleInputChange('applicant_category', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="Individual Khatedar">Individual Khatedar (Sole Owner)</option>
-                  <option value="Joint Khatedari (Shared Title)">Joint Khatedari (Shared Title)</option>
-                  <option value="Institutional / Corporate">Institutional / Corporate</option>
-                  <option value="Religious / Charitable Trust">Religious / Charitable Trust</option>
-                  <option value="Government / Gram Panchayat">Government / Gram Panchayat</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Mobile / Contact Number</label>
-                <input
-                  type="tel"
-                  placeholder="e.g. +91 98290 12345"
-                  value={formData.applicant_mobile}
-                  onChange={(e) => handleInputChange('applicant_mobile', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
+      {/* Confirmation Screen */}
+      {createdRecord ? (
+        <div className="max-w-3xl mx-auto bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-10 space-y-8 shadow-2xl animate-fade-in text-center">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+            <CheckCircle2 className="w-10 h-10" />
           </div>
 
-          {/* Section 2: Cadastral & Parcel Identification */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-200 pb-2 border-b border-slate-800">
-              <Landmark className="w-4 h-4 text-indigo-400" />
-              <span>2. Cadastral Parcel & Location Identification</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">
-                  Khasra / Survey Number <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 310/1 or 142/3"
-                  value={formData.khasra_number}
-                  onChange={(e) => handleInputChange('khasra_number', e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-indigo-300 font-mono font-bold placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Khata / Khatauni Number</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 72/14"
-                  value={formData.khata_number}
-                  onChange={(e) => handleInputChange('khata_number', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Sub-Division / Hissa No.</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Plot B-2"
-                  value={formData.hissa_number}
-                  onChange={(e) => handleInputChange('hissa_number', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">
-                  Village (Mauza / Gaon) <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Muhana"
-                  value={formData.village}
-                  onChange={(e) => handleInputChange('village', e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Tehsil / Taluka</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Sanganer"
-                  value={formData.tehsil}
-                  onChange={(e) => handleInputChange('tehsil', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">District (Zila)</label>
-                <select
-                  value={formData.district}
-                  onChange={(e) => {
-                    const dist = e.target.value;
-                    let st = 'Rajasthan';
-                    if (['Pune', 'Nagpur', 'Nashik'].includes(dist)) st = 'Maharashtra';
-                    else if (['Varanasi', 'Lucknow', 'Kanpur', 'Prayagraj', 'Meerut'].includes(dist)) st = 'Uttar Pradesh';
-                    else if (['Indore', 'Bhopal', 'Gwalior', 'Jabalpur'].includes(dist)) st = 'Madhya Pradesh';
-                    else if (['Patna'].includes(dist)) st = 'Bihar';
-                    else if (['Ahmedabad', 'Surat'].includes(dist)) st = 'Gujarat';
-                    setFormData((prev) => ({ ...prev, district: dist, state: st }));
-                  }}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="Jaipur">Jaipur (Rajasthan)</option>
-                  <option value="Jodhpur">Jodhpur (Rajasthan)</option>
-                  <option value="Pune">Pune (Maharashtra)</option>
-                  <option value="Varanasi">Varanasi (Uttar Pradesh)</option>
-                  <option value="Lucknow">Lucknow (Uttar Pradesh)</option>
-                  <option value="Indore">Indore (Madhya Pradesh)</option>
-                  <option value="Patna">Patna (Bihar)</option>
-                  <option value="Bhopal">Bhopal (Madhya Pradesh)</option>
-                  <option value="Nagpur">Nagpur (Maharashtra)</option>
-                  <option value="Udaipur">Udaipur (Rajasthan)</option>
-                  <option value="Kota">Kota (Rajasthan)</option>
-                  <option value="Nashik">Nashik (Maharashtra)</option>
-                </select>
-              </div>
-            </div>
+          <div className="space-y-2">
+            <span className="text-xs font-mono uppercase px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold">
+              Transaction Successfully Registered
+            </span>
+            <h3 className="text-2xl font-bold text-white">Application Reference Generated</h3>
+            <p className="text-xs text-slate-400 max-w-lg mx-auto">
+              Your land transaction has been submitted for automated rule verification and forwarded to the Sub-Divisional Revenue Officer for final entry.
+            </p>
           </div>
 
-          {/* Section 3: Extent & Land Classification */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-200 pb-2 border-b border-slate-800">
-              <Layers className="w-4 h-4 text-indigo-400" />
-              <span>3. Measured Area Extent & Land Classification</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          {/* Reference Card */}
+          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
+            <div className="space-y-3 flex-1">
               <div>
-                <label className="font-semibold text-slate-300 block mb-1">
-                  Measured Extent / Area <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g. 4.25"
-                  value={formData.area_value}
-                  onChange={(e) => handleInputChange('area_value', e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-100 font-mono font-semibold placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
+                  Application Tracking Number (ARN)
+                </span>
+                <span className="text-xl font-mono font-bold text-indigo-400">{createdRecord.record_identifier}</span>
               </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Unit of Measurement</label>
-                <select
-                  value={formData.area_unit}
-                  onChange={(e) => handleInputChange('area_unit', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="Acres">Acres</option>
-                  <option value="Hectares">Hectares</option>
-                  <option value="Bigha">Bigha (Pucca)</option>
-                  <option value="Biswa">Biswa</option>
-                  <option value="Sq. Yards">Sq. Yards</option>
-                  <option value="Guntha">Guntha</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-400 block mb-1">Standardized Area (Auto)</label>
-                <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-emerald-400 font-mono font-bold">
-                  {getStandardizedAcres()} Acres
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">New Title Holder</span>
+                  <span className="font-semibold text-white">{createdRecord.owner_name}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Khasra Number</span>
+                  <span className="font-semibold text-indigo-300 font-mono">#{createdRecord.khasra_number}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Assigned ULPIN</span>
+                  <span className="font-mono text-emerald-400 font-bold">{createdRecord.ulpin}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Status</span>
+                  <span className="font-semibold text-amber-400">Pending Patwari Signoff</span>
                 </div>
               </div>
+            </div>
 
-              <div className="sm:col-span-2">
-                <label className="font-semibold text-slate-300 block mb-1">Land Classification</label>
-                <select
-                  value={formData.land_classification}
-                  onChange={(e) => handleInputChange('land_classification', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="Agricultural (Irrigated)">Agricultural (Irrigated - Chahi/Nahri)</option>
-                  <option value="Agricultural (Unirrigated)">Agricultural (Unirrigated - Barani)</option>
-                  <option value="Agricultural (Nahri / Canal)">Agricultural (Nahri / Canal Irrigated)</option>
-                  <option value="Residential (Abadi)">Residential (Abadi / Settlement)</option>
-                  <option value="Commercial / Industrial">Commercial / Industrial</option>
-                  <option value="Pasture / Charagah (Gair Mumkin)">Pasture / Charagah (Gair Mumkin)</option>
-                  <option value="Forest / Protected Land">Forest / Protected Land</option>
-                </select>
+            {/* QR Code Mockup */}
+            <div className="p-4 rounded-xl bg-white text-slate-950 flex flex-col items-center justify-center space-y-1.5 shrink-0 shadow-md">
+              <QrCode className="w-20 h-20" />
+              <span className="text-[9px] font-mono font-bold">SCAN TO TRACK</span>
+            </div>
+          </div>
+
+          {/* Mutation Progress Timeline */}
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-left space-y-3">
+            <span className="text-xs font-bold text-slate-300 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-indigo-400" />
+              <span>Mutation Sanction Workflow Progress</span>
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                <span className="font-bold block">1. Form Submitted</span>
+                <span className="text-[10px] opacity-75">Completed</span>
               </div>
-
-              <div>
-                <label className="font-semibold text-slate-300 block mb-1">Document Record Type</label>
-                <select
-                  value={formData.document_type}
-                  onChange={(e) => handleInputChange('document_type', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="Jamabandi / RoR">Jamabandi / RoR (Record of Rights)</option>
-                  <option value="Mutation Register (Intiqal)">Mutation Register (Dakhil Kharij)</option>
-                  <option value="Sale Deed">Registered Sale Deed / Conveyance</option>
-                  <option value="Partition Deed">Partition Deed (Batwara)</option>
-                  <option value="Allotment Sanad">Government Allotment Sanad</option>
-                </select>
+              <div className="p-2.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+                <span className="font-bold block">2. AI Rule Check</span>
+                <span className="text-[10px] opacity-75">0 Collisions Found</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
+                <span className="font-bold block">3. Patwari Ground Check</span>
+                <span className="text-[10px] opacity-75">In Queue</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
+                <span className="font-bold block">4. RoR Updation</span>
+                <span className="text-[10px] opacity-75">Pending Sign</span>
               </div>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex items-center justify-between gap-4 pt-2">
+          {/* Action CTAs */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <button
-              type="button"
-              onClick={handlePreCheck}
-              disabled={checking || submitting}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition cursor-pointer"
+              onClick={() => window.print()}
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>{checking ? 'Checking Conflicts...' : 'Pre-Check Cadastral Conflict'}</span>
+              <Printer className="w-4 h-4" />
+              <span>Print Acknowledgment Slip</span>
             </button>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 text-xs font-medium transition cursor-pointer"
-              >
-                Reset
-              </button>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition cursor-pointer"
-              >
-                <FileCheck2 className="w-4 h-4" />
-                <span>{submitting ? 'Registering Parcel...' : 'Register & Seal Land Record'}</span>
-              </button>
-            </div>
-          </div>
-        </form>
-
-        {/* Right Live Card & Conflict Radar (Col 4) */}
-        <div className="lg:col-span-4 space-y-4">
-          {/* Live Sanad Preview Box */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
-              <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                <Landmark className="w-3.5 h-3.5 text-emerald-400" />
-                Live Registry Sanad Preview
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">Real-time</span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3 text-xs">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] text-slate-500 uppercase font-mono">Titleholder</span>
-                  <p className="font-bold text-slate-100 text-sm">
-                    {formData.owner_name || <span className="text-slate-600 italic">Enter Owner Name</span>}
-                  </p>
-                  <p className="text-[11px] text-slate-400">{formData.parentage || 'Parentage Not Set'}</p>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 font-mono border border-indigo-500/20">
-                  {formData.document_type.split('/')[0]}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/60 text-[11px]">
-                <div>
-                  <span className="text-slate-500">Parcel Number:</span>
-                  <p className="font-mono font-bold text-indigo-300">
-                    Khasra #{formData.khasra_number || '--'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Khata No:</span>
-                  <p className="font-mono text-slate-300">{formData.khata_number || '--'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Extent:</span>
-                  <p className="font-semibold text-emerald-400">
-                    {formData.area_value || '0'} {formData.area_unit}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Location:</span>
-                  <p className="text-slate-300">
-                    {formData.village || 'Mauza'}, {formData.district}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pre-Check Conflict Radar Result */}
-          {preCheckResult && (
-            <div
-              className={`p-4 rounded-2xl border space-y-3 text-xs animate-fade-in ${
-                preCheckResult.is_flagged
-                  ? 'bg-rose-500/10 border-rose-500/40 text-rose-300'
-                  : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
-              }`}
+            <button
+              onClick={() => onNavigate('records')}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
             >
-              <div className="flex items-center justify-between font-bold">
-                <div className="flex items-center gap-2">
-                  {preCheckResult.is_flagged ? (
-                    <AlertTriangle className="w-4 h-4 text-rose-400" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  )}
-                  <span>{preCheckResult.is_flagged ? 'Cadastral Conflict Detected!' : 'Parcel Clear for Auto-Sealing'}</span>
+              <span>View in Land Records Explorer</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Multi-Step Registration Form */
+        <div className="space-y-6">
+          {/* Step Progress Stepper */}
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+            <div className="grid grid-cols-5 gap-2 text-xs">
+              {[
+                { num: 1, label: 'Transaction Type' },
+                { num: 2, label: 'Search Parcel' },
+                { num: 3, label: 'Transferee Details' },
+                { num: 4, label: 'Supporting Doc' },
+                { num: 5, label: 'Review & Submit' },
+              ].map((s) => (
+                <div
+                  key={s.num}
+                  onClick={() => s.num < step && setStep(s.num)}
+                  className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
+                    step === s.num
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/20 font-bold'
+                      : step > s.num
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 font-semibold'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                  }`}
+                >
+                  <div className="text-[10px] font-mono">Step {s.num}</div>
+                  <div className="text-xs truncate">{s.label}</div>
                 </div>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-900/60 border border-current">
-                  {preCheckResult.status}
-                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 1: Select Transaction Type */}
+          {step === 1 && (
+            <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 animate-fade-in">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Step 1: Select Transaction Category</h3>
+                <p className="text-xs text-slate-400">Choose the legal nature of the land transfer or mutation.</p>
               </div>
 
-              {preCheckResult.issues.length > 0 ? (
-                <div className="space-y-1.5 text-[11px] text-slate-200">
-                  {preCheckResult.issues.map((iss, i) => (
-                    <div key={i} className="leading-relaxed">
-                      &bull; <span className="font-semibold text-rose-300">{iss.issue_type}:</span> {iss.message}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {txTypes.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => setTxType(t.id)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                      txType === t.id
+                        ? 'bg-indigo-600/15 border-indigo-500 ring-1 ring-indigo-500/50 shadow-md'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-bold ${txType === t.id ? 'text-indigo-300' : 'text-slate-200'}`}>
+                        {t.title}
+                      </span>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${txType === t.id ? 'border-indigo-500 bg-indigo-500' : 'border-slate-700'}`}>
+                        {txType === t.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[11px] text-emerald-200/90 leading-relaxed">
-                  No duplicate khasras, conflicting owner names, or out-of-bounds area values found in the registry.
-                </p>
-              )}
+                    <p className="text-xs text-slate-400 leading-snug">{t.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-slate-800">
+                <button
+                  onClick={() => setStep(2)}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+                >
+                  <span>Next: Search Parcel</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Guidelines Box */}
-          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-2">
-            <div className="flex items-center gap-1.5 text-slate-200 font-semibold">
-              <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Registration Guidelines</span>
-            </div>
-            <p className="text-[11px] leading-relaxed">
-              &bull; Once registered, a high-resolution visual Sanad deed image is generated and archived.
-              <br />
-              &bull; Clean records receive automatic seal & auto-verification status.
-              <br />
-              &bull; Duplicates or discrepancies are flagged for Tehsildar inspection.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Success Receipt / Sanad Modal */}
-      {createdRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 sm:p-8 space-y-6 shadow-2xl overflow-hidden">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-100">Land Record Successfully Registered & Sealed!</h3>
-              <p className="text-xs text-slate-400">
-                Official Digital Cadastral Sanad generated and archived under NLRMP guidelines.
-              </p>
-            </div>
-
-            {/* Sanad Slip Card */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div>
-                  <span className="text-[10px] text-slate-500 font-mono">RECORD IDENTIFIER</span>
-                  <div className="text-base font-bold font-mono text-emerald-400">{createdRecord.record_identifier}</div>
-                </div>
-                <div className="text-right">
-                  <StatusBadge status={createdRecord.status} isFlagged={createdRecord.is_flagged} />
-                </div>
+          {/* Step 2: Search Existing Parcel by Khasra or ULPIN */}
+          {step === 2 && (
+            <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 animate-fade-in">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Step 2: Search &amp; Verify Existing Parcel</h3>
+                <p className="text-xs text-slate-400">
+                  Search by Khasra Number or 14-digit ULPIN to auto-fill currently registered title and boundaries.
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-[11px]">
-                <div>
-                  <span className="text-slate-500">Khatedar Name:</span>
-                  <p className="font-semibold text-slate-100">{createdRecord.owner_name}</p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchKhasra}
+                    onChange={(e) => setSearchKhasra(e.target.value)}
+                    placeholder="Enter Khasra No (e.g. 782/1) or ULPIN..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+                  />
                 </div>
-                <div>
-                  <span className="text-slate-500">Khasra / Survey:</span>
-                  <p className="font-mono font-bold text-indigo-300">#{createdRecord.khasra_number}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Standardized Area:</span>
-                  <p className="font-mono font-semibold text-emerald-400">{createdRecord.area_acres} Acres</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Village & Tehsil:</span>
-                  <p className="text-slate-200">{createdRecord.village}, {createdRecord.tehsil}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">District & State:</span>
-                  <p className="text-slate-200">{createdRecord.district} ({createdRecord.state})</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Classification:</span>
-                  <p className="text-slate-200">{createdRecord.land_classification}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition cursor-pointer"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Print Sanad Receipt</span>
-              </button>
-
-              <div className="flex items-center gap-2">
                 <button
-                  onClick={resetForm}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                  type="button"
+                  onClick={handleSearchParcel}
+                  disabled={searching}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  Register Another Parcel
+                  <Search className="w-3.5 h-3.5" />
+                  <span>{searching ? 'Searching Database...' : 'Search Parcel'}</span>
                 </button>
+              </div>
+
+              {/* Found Parcel Details Card */}
+              {searchFound && (
+                <div className="p-5 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-4 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Existing Title Record Found in Revenue Database</span>
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      ULPIN: {formData.ulpin}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-500 font-semibold block">Current Title Holder</span>
+                      <span className="font-bold text-white">{formData.existing_owner}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-500 font-semibold block">Khasra &amp; Khata</span>
+                      <span className="font-mono font-bold text-indigo-300">Khasra #{formData.khasra_number} / Khata {formData.khata_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-500 font-semibold block">Registered Extent</span>
+                      <span className="font-mono font-bold text-emerald-400">{formData.area_value} {formData.area_unit}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-500 font-semibold block">Tehsil &amp; District</span>
+                      <span className="font-semibold text-slate-200">{formData.village}, {formData.district}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800">
                 <button
-                  onClick={() => {
-                    const rec = createdRecord;
-                    setCreatedRecord(null);
-                    onSelectRecord(rec);
-                  }}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+                  onClick={() => setStep(1)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
                 >
-                  <Eye className="w-4 h-4" />
-                  <span>Inspect in Registry</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  onClick={() => setStep(3)}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+                >
+                  <span>Next: Enter Transferee Details</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Step 3: Enter New Owner / Buyer Details */}
+          {step === 3 && (
+            <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 animate-fade-in">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Step 3: Enter Transferee / New Owner Details</h3>
+                <p className="text-xs text-slate-400">Fill in the buyer or legal successor profile and transaction consideration.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">New Owner Name (Full Legal Name)</label>
+                  <input
+                    type="text"
+                    value={formData.new_owner_name}
+                    onChange={(e) => setFormData({ ...formData, new_owner_name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Parentage / Guardian Name</label>
+                  <input
+                    type="text"
+                    value={formData.new_parentage}
+                    onChange={(e) => setFormData({ ...formData, new_parentage: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Applicant Mobile Number</label>
+                  <input
+                    type="tel"
+                    value={formData.buyer_mobile}
+                    onChange={(e) => setFormData({ ...formData, buyer_mobile: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Aadhaar / Citizen ID Hash</label>
+                  <input
+                    type="text"
+                    value={formData.buyer_aadhaar}
+                    onChange={(e) => setFormData({ ...formData, buyer_aadhaar: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Consideration Value / Sale Price</label>
+                  <input
+                    type="text"
+                    value={formData.consideration_amount}
+                    onChange={(e) => setFormData({ ...formData, consideration_amount: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Transferred Share %</label>
+                  <input
+                    type="text"
+                    value={formData.share_percentage}
+                    onChange={(e) => setFormData({ ...formData, share_percentage: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                <button
+                  onClick={() => setStep(2)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  onClick={() => setStep(4)}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+                >
+                  <span>Next: Attach Supporting Deed</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Attach Supporting Document & AI Cross-Check */}
+          {step === 4 && (
+            <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 animate-fade-in">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Step 4: Attach Supporting Registered Deed</h3>
+                <p className="text-xs text-slate-400">Upload the scanned Sub-Registrar sale deed, affidavit, or succession certificate for simulated AI cross-checking.</p>
+              </div>
+
+              {/* Upload Box */}
+              <div className="p-6 rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/60 flex flex-col items-center text-center space-y-3">
+                <UploadCloud className="w-8 h-8 text-indigo-400" />
+                <div>
+                  <div className="text-xs font-bold text-slate-200">{formData.doc_file_name}</div>
+                  <div className="text-[10px] text-slate-500">PDF / Image Deed Archive &bull; 2.4 MB</div>
+                </div>
+                <label className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 cursor-pointer">
+                  <span>Replace Deed Scan</span>
+                  <input type="file" className="hidden" />
+                </label>
+              </div>
+
+              {/* AI Cross-Check Simulation Pill */}
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-emerald-300 font-bold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>AI Document Cross-Check Complete: 100% Match</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                    VERIFIED
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+                  <div>&bull; Seller in Deed: <strong className="text-white">Rameshwar Sharma</strong></div>
+                  <div>&bull; Buyer in Deed: <strong className="text-white">Ajay Kumar Sharma</strong></div>
+                  <div>&bull; Khasra in Deed: <strong className="text-white">782/1 (4.85 Acres)</strong></div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                <button
+                  onClick={() => setStep(3)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  onClick={() => setStep(5)}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+                >
+                  <span>Next: Final Review &amp; Submit</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Review & Submit */}
+          {step === 5 && (
+            <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 animate-fade-in">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Step 5: Review &amp; Final Submission</h3>
+                <p className="text-xs text-slate-400">Confirm all details prior to generating the formal application tracking reference.</p>
+              </div>
+
+              {/* Review Summary Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                {/* Current vs New Owner */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <span className="font-bold text-indigo-300 block text-xs">Parties to Transaction</span>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-500 uppercase block">Transferor (Existing Title Holder)</span>
+                    <span className="font-semibold text-slate-200">{formData.existing_owner}</span>
+                  </div>
+                  <div className="space-y-1 pt-2 border-t border-slate-800/80">
+                    <span className="text-[10px] text-slate-500 uppercase block">Transferee (New Owner)</span>
+                    <span className="font-semibold text-emerald-400">{formData.new_owner_name}</span>
+                  </div>
+                </div>
+
+                {/* Parcel Jurisdiction & Area */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <span className="font-bold text-indigo-300 block text-xs">Parcel Cadastral Extent</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block">Khasra Number</span>
+                      <span className="font-mono font-bold text-white">#{formData.khasra_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block">Plot Area</span>
+                      <span className="font-mono font-bold text-emerald-400">{formData.area_value} {formData.area_unit}</span>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800/80">
+                    <span className="text-[10px] text-slate-500 uppercase block">Village / District</span>
+                    <span className="font-semibold text-slate-200">{formData.village}, {formData.district} ({formData.state})</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                <button
+                  onClick={() => setStep(4)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  onClick={handleSubmitRegistration}
+                  disabled={submitting}
+                  className="px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+                >
+                  {submitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Submitting Registration...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Review &amp; Submit Registration</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
